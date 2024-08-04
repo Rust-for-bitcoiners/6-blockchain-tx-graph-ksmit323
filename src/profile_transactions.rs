@@ -1,6 +1,6 @@
-use std::env;
-use bitcoincore_rpc::{Auth, Client};
 use bitcoin::hash_types::Txid;
+use bitcoincore_rpc::{Auth, Client, RpcApi};
+use std::env;
 
 use super::graph::Graph;
 
@@ -21,5 +21,20 @@ fn build_transaction_graph(start_height: u64, end_height: u64) -> Graph<Txid> {
     // We say a Transaction A funds Transaction B if an ouput of A is an input of B
     // Build a graph where nodes represents Txid and an edge (t1, t2) is in the graph
     // if the transaction t1 funds transaction t2
-    Graph::new()
+    let mut graph = Graph::new();
+    
+    for height in start_height..=end_height {
+        let block_hash = RPC_CLIENT.get_block_hash(height).unwrap();
+        let block = RPC_CLIENT.get_block(&block_hash).unwrap();
+        
+        for tx in block.txdata {
+            graph.insert_vertex(tx.compute_txid());
+            
+            for input in &tx.input {
+                graph.insert_edge(input.previous_output.txid, tx.compute_txid());
+            }
+        }
+    }
+
+    graph
 }
